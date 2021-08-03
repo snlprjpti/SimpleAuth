@@ -3,22 +3,36 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\InvalidInvitationToken;
+use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Repository\UserRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Http\Resources\Json\ResourceCollection;
 use Illuminate\Support\Facades\Hash;
 use Exception;
 use Illuminate\Support\Facades\Validator;
 
-class UserInvitationController extends Controller
+class UserInvitationController extends BaseController
 {
-    private $user, $userRepository;
+    private $user, $repository;
 
-    public function __construct(User $user, UserRepository $userRepository)
+    public function __construct(User $user, UserRepository $repository)
     {
+        parent::__construct();
         $this->user = $user;
-        $this->userRepository = $userRepository;
+        $this->repository = $repository;
+    }
+
+    public function collection(object $data): ResourceCollection
+    {
+        return UserResource::collection($data);
+    }
+
+    public function resource(object $data): JsonResource
+    {
+        return new UserResource($data);
     }
 
     public function getInvitationPin(Request $request)
@@ -31,7 +45,7 @@ class UserInvitationController extends Controller
         }
         catch (Exception $exception)
         {
-            return $exception->getMessage();
+            return $this->handleException($exception);
         }
 
         return response()->json( ["invitation_pin" => $user->invitation_pin], 201);
@@ -41,15 +55,12 @@ class UserInvitationController extends Controller
     {
         try
         {
-            $data = $request->all();
-            $validator = Validator::make($data, [
+            $data = $this->repository->validateData($request, [
                 'invitation_pin' => 'required',
                 'user_name' => 'required|unique:users,user_name|min:4|max:20',
                 'password' => 'required|confirmed|min:6',
             ]);
-            if ($validator->fails()) {
-                return $this->validationErrors($validator->errors());
-            }
+
             $user = $this->user->whereInvitationPin($request->invitation_pin)->first();
 
             if ( !$user ) throw new InvalidInvitationToken(__("Invalid Pin"));
@@ -60,13 +71,13 @@ class UserInvitationController extends Controller
                 "password" => Hash::make($data["password"])
             ];
 
-            $updated = $this->userRepository->update($data, $user->id);
+            $updated = $this->repository->update($data, $user->id);
         }
         catch (Exception $exception)
         {
-            return $exception->getMessage();
+            return $this->handleException($exception);
         }
 
-        return response()->json($updated, 201);
+        return $this->successResponse($this->resource($updated), "Registered Successfully", 201);
     }
 }

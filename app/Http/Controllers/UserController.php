@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Repository\UserRepository;
-use http\Env\Response;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Http\Resources\Json\ResourceCollection;
@@ -14,7 +13,7 @@ use Illuminate\Support\Facades\Hash;
 use Exception;
 use Illuminate\Support\Facades\Validator;
 
-class UserController extends Controller
+class UserController extends BaseController
 {
     /**
      * @var User
@@ -23,15 +22,16 @@ class UserController extends Controller
     /**
      * @var UserRepository
      */
-    private $userRepository;
+    private $repository;
 
     /**
      * UserController constructor.
      */
-    public function __construct(User $user, UserRepository $userRepository)
+    public function __construct(User $user, UserRepository $repository)
     {
+        parent::__construct();
         $this->user = $user;
-        $this->userRepository = $userRepository;
+        $this->repository = $repository;
     }
 
     public function collection(object $data): ResourceCollection
@@ -47,23 +47,23 @@ class UserController extends Controller
     public function inviteUser(Request $request)
     {
         try {
-            if(auth()->user()->role != 'admin') return response()->json("unauthorized access", 401);
-            $data = $request->all();
-            $validator = Validator::make($request->all(), [
+            if(auth()->user()->role != 'admin') return $this->errorResponse("Unauthorized Access", 401);
+
+            $data = $this->repository->validateData($request, [
                 "name" => "required",
                 "email" => "required|unique:users,email",
             ]);
-            if ($validator->fails()) {
-                return $this->validationErrors($validator->errors());
-            }
-            $created = $this->userRepository->create($data, function ($created) use ($request) {
-                $this->userRepository->storeInvitation($created);
+
+            $created = $this->repository->create($data, function ($created) use ($request) {
+                $this->repository->storeInvitation($created);
             });
-        } catch (Exception $exception) {
-            return $exception;
+        }
+        catch (Exception $exception)
+        {
+            return $this->handleException($exception);
         }
 
-        return response()->json($this->resource($created), 201);
+        return $this->successResponse($this->resource($created), "Created Successfully", 201);
     }
 
 
@@ -72,17 +72,15 @@ class UserController extends Controller
         try
         {
             $user_id = Auth::user()->id;
-            $data = $request->all();
-            $validator = Validator::make($data  , [
+
+            $data = $this->repository->validateData($request, [
                 "email" => "sometimes|email|unique:users,email,{$user_id}",
                 "password" => is_null($request->password) ? "sometimes|nullable" : "required|confirmed",
                 "name" => "sometimes",
                 "user_name" => "sometimes|unique:users,user_name,{$user_id}",
                 "avatar" => "sometimes|mimes:jpg,png,jpeg",
             ]);
-            if ($validator->fails()) {
-                return $this->validationErrors($validator->errors());
-            }
+
             if ( is_null($request->password) ) {
                 unset($data["password"]);
             } else {
@@ -91,17 +89,17 @@ class UserController extends Controller
 
             if($request->avatar)
             {
-                $image = $this->userRepository->createImage($request->avatar);
+                $image = $this->repository->createImage($request->avatar);
                 $data = array_merge($data,$image);
             }
 
-            $updated = $this->userRepository->update($data, $user_id);
+            $updated = $this->repository->update($data, $user_id);
         }
         catch (Exception $exception)
         {
-            return $exception->getMessage();
+            return $this->handleException($exception);
         }
 
-        return response()->json($this->resource($updated), 201);
+        return $this->successResponse($this->resource($updated), "Profile Update Successfully", 201);
     }
 }

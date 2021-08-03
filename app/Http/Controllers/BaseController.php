@@ -17,7 +17,6 @@ class BaseController extends Controller
 
     public function __construct( array $exception_statuses = [] )
     {
-
         // Frequently thrown excpetions
         $this->exception_statuses = array_merge([
             ValidationException::class => 422,

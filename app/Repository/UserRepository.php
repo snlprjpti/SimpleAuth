@@ -5,13 +5,11 @@ namespace App\Repository;
 use App\Models\User;
 use App\Notifications\InvitationNotification;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Exception;
 use Intervention\Image\Facades\Image;
 
-class UserRepository
+class UserRepository extends BaseRepository
 {
     /**
      * @var User
@@ -21,8 +19,8 @@ class UserRepository
     public function __construct(User $user)
     {
         $this->user = $user;
+        $this->rules = [];
     }
-
 
     public function create(array $data, ?callable $callback = null): object
     {
