@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Exception;
 use Illuminate\Support\Facades\Validator;
 
-class LoginController extends Controller
+class LoginController extends BaseController
 {
     /**
      * LoginController constructor.
@@ -23,21 +23,19 @@ class LoginController extends Controller
     {
         try
         {
-            $data = $request->all();
-
-            $validator = Validator::make($data, [
+            $request->validate([
                 "email" => "required|email|exists:users,email",
                 "password" => "required"
+            ], [
+                "email.exists" => "Invalid Credentials."
             ]);
-            if ($validator->fails()) {
-                return $this->validationErrors($validator->errors());
-            }
 
             if (Auth::attempt(['email' => request('email'), 'password' => request('password')])) {
                 $user = Auth::user();
-                $token = $user->createToken('MyApp')->accessToken;
+                $token = $user->createToken('app')->accessToken;
             } else {
-                return response()->json(['error' => 'Unauthorised'], 401);
+
+                return $this->errorResponse("Login Error", 401);
             }
 
             $payload = [
@@ -47,7 +45,7 @@ class LoginController extends Controller
         }
         catch( Exception $exception )
         {
-            return $exception->getMessage();
+            return $this->handleException($exception);
         }
 
         return response()->json($payload, "200");
@@ -65,7 +63,7 @@ class LoginController extends Controller
         }
         catch( Exception $exception )
         {
-            return $exception->getMessage();
+            return $this->handleException($exception);
         }
     }
 }
